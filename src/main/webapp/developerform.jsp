@@ -10,9 +10,11 @@
 <center>
 <form action="devdb">
 <input type="text" placeholder="Enter your app name" name="appname"><br><br>
-<input type="url" placeholder="Enter your redirected uri" name="urls"><br><br>
+<input type="text" placeholder="Enter your redirected uri1" name="url1"><br><br>
+<input type="text" placeholder="Enter your redirected uri2" name="url2"><br><br>
+<input type="text" placeholder="Enter your redirected uri3" name="url3"><br><br>
 <input type="submit">
-</center>
 </form>
+</center>
 </body>
 </html>

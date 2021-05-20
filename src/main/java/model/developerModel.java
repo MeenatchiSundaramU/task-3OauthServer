@@ -1,8 +1,8 @@
 package model;
 
-public class developerModel 
+public class DeveloperModel 
 {
-    private String Clientid,ClientSecret,Appname,Redirecturi;
+	private String Clientid,ClientSecret,Appname,Redirecturi_1,Redirecturi_2,Redirecturi_3;
 
 	public String getClientid() {
 		return Clientid;
@@ -28,11 +28,28 @@ public class developerModel
 		Appname = appname;
 	}
 
-	public String getRedirecturi() {
-		return Redirecturi;
+	public String getRedirecturi_1() {
+		return Redirecturi_1;
 	}
 
-	public void setRedirecturi(String redirecturi) {
-		Redirecturi = redirecturi;
+	public void setRedirecturi_1(String redirecturi_1) {
+		Redirecturi_1 = redirecturi_1;
 	}
+
+	public String getRedirecturi_2() {
+		return Redirecturi_2;
+	}
+
+	public void setRedirecturi_2(String redirecturi_2) {
+		Redirecturi_2 = redirecturi_2;
+	}
+
+	public String getRedirecturi_3() {
+		return Redirecturi_3;
+	}
+
+	public void setRedirecturi_3(String redirecturi_3) {
+		Redirecturi_3 = redirecturi_3;
+	}
+
 }

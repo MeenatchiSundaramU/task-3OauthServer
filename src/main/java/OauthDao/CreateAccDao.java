@@ -50,7 +50,7 @@ public class CreateAccDao
 		{
 			  st.close();
 			  conn.close();
-		     return 0;
+		      return 0;
 		}
 		else
 		{
@@ -69,7 +69,7 @@ public class CreateAccDao
 		System.out.print("Entered Databse"+scopename+uids);
 		Connection conn=developerDao.connect();
 		PreparedStatement st;
-		if(scopename=="profile")
+		if(scopename.equals("profile")==true)
 		st=conn.prepareStatement("select * from scopetable where uid=? and profile=\"1\"");
 		else
 		st=conn.prepareStatement("select * from scopetable where uid=? and location=\"1\"");
@@ -89,12 +89,27 @@ public class CreateAccDao
 		}
 	}
 	
+	//Acknowledged to Server Database the resource owner grants permission to that particular resources
+	public static void acknowledgeResourceGranted(String clientid,int uid,String scopename) throws SQLException, ClassNotFoundException
+	{
+		Connection conn=developerDao.connect();
+		PreparedStatement st;
+		if(scopename.equals("profile")==true)
+		st=conn.prepareStatement("insert into resourcegranted(clientid,uid,profile,location)values(?,?,1,0)");
+		else
+		st=conn.prepareStatement("insert into resourcegranted(clientid,uid,profile,location)values(?,?,0,1)");
+		st.setString(1,clientid);
+		st.setInt(2,uid);
+		st.executeUpdate();
+		st.close();
+		conn.close();
+	}
 	
 	//Stored the Authorization grant code 
-	public static void StoreGrandCode(String clientid,int uids,String time,String grandcode) throws SQLException, ClassNotFoundException
+	public static void StoreGrandCode(String clientid,int uids,String time,String grandcode,String scopename) throws SQLException, ClassNotFoundException
 	{
 		 Connection conn=developerDao.connect();
-	   	 PreparedStatement st=conn.prepareStatement("insert into grandcodelog(clientid,uid,grantcode,timestamp) values(?,?,?,?)");
+	   	 PreparedStatement st=conn.prepareStatement("insert into grantcodelog(clientid,uid,grantcode,timestamp) values(?,?,?,?)");
 	   	 st.setString(1,clientid);
 	   	 st.setInt(2,uids);
 	   	 st.setString(3,grandcode);
@@ -105,31 +120,30 @@ public class CreateAccDao
 	}
 	
 	
-	//Validation the grant code
+	//Validation the grant code for generation of access token
 	public static boolean validateGrandCode(String grantcode) throws SQLException, ClassNotFoundException, ParseException
 	{
 		 Connection conn=developerDao.connect();
-	   	 PreparedStatement st=conn.prepareStatement("select * from grandcodelog where grantcode=?");
+	   	 PreparedStatement st=conn.prepareStatement("select * from grantcodelog where grantcode=?");
 	   	 st.setString(1,grantcode);
 	   	 ResultSet rs=st.executeQuery();
 	   	 if(rs.next()==false)
 	   		  return false;
 	   	 else {
-	   	 String tokgtime=rs.getString("timestamp");
-	   	 Calendar cal = Calendar.getInstance();
+	   	 String grandtoktime=rs.getString("timestamp");
+	   	 Calendar tokcal = Calendar.getInstance();
 	   	 SimpleDateFormat sdf = new SimpleDateFormat("EEE MMM dd HH:mm:ss z yyyy", Locale.ENGLISH);
-	   	 cal.setTime((sdf.parse(tokgtime)));
-	   	 System.out.print(cal.getTime().toString());
-	   	 Calendar cal2= Calendar.getInstance();
-	   	 st=conn.prepareStatement("delete from grandcodelog where uid=? and grantcode=?");
+	   	 tokcal.setTime((sdf.parse(grandtoktime)));
+	   	 Calendar currtime= Calendar.getInstance();
+	   	 st=conn.prepareStatement("delete from grantcodelog where uid=? and grantcode=?");
 	   	 st.setInt(1, rs.getInt("uid"));
 	   	 st.setString(2, grantcode);
 	   	 st.executeUpdate();
-	   	 if(cal.compareTo(cal2)>0)
+	   	 if(tokcal.compareTo(currtime)>0)
 	   	 {
 	   		st.close();
 			conn.close();
-	   	      return true;
+	   	    return true;
 	   	 }
 	   	 else
 	   	 {
@@ -140,54 +154,54 @@ public class CreateAccDao
 	   	 }
 	}
 	
-	//Save the access tokens and refresh tokens
-	public static void SaveTokens(String accesstoken,String refreshtoken,String accesstime,int uid,String clientid) throws ClassNotFoundException, SQLException
+	//Save access token
+	public static void saveAccessTokens(String clientid,int uid,String accesstoken,String timestamp) throws SQLException, ClassNotFoundException
 	{
+		System.out.println("Access token database enter");
 		Connection conn=developerDao.connect();
-		PreparedStatement checktok=conn.prepareStatement("select * from accesstoken where uid=? and clientid=? and accesstoken=?");
-		checktok.setInt(1, uid);
-		checktok.setString(2, clientid);
-		checktok.setString(3, accesstoken);
-		ResultSet rscheck=checktok.executeQuery();
-		if(rscheck.next()!=false)
+		PreparedStatement savetok=conn.prepareStatement("insert into accesstoken(clientid,uid,accesstoken,timestamp)values(?,?,?,?)");
+		savetok.setString(1, clientid);
+		savetok.setInt(2, uid);
+		savetok.setString(3, accesstoken);
+		savetok.setString(4, timestamp);
+		savetok.executeUpdate();
+		savetok.close();
+		conn.close();
+		System.out.println("Access token database closed");
+	}
+	
+	//Process the refresh Token below
+	public static String saveRefreshToken(String clientid,int uid,String accesstoken,String timestamp) throws ClassNotFoundException, SQLException
+	{
+		saveAccessTokens(clientid, uid, accesstoken, timestamp);
+		int tok_consumes=0;
+		String refreshTokens;
+		Connection conn=developerDao.connect();
+		PreparedStatement checkRefAvail=conn.prepareStatement("select max(tokenremain) as REMAIN from refreshtoken where clientid=? and uid=?");
+		checkRefAvail.setString(1, clientid);
+		checkRefAvail.setInt(2, uid);
+		ResultSet tokconsumes=checkRefAvail.executeQuery();
+		if(tokconsumes.next()==false)
 		{
-			checktok=conn.prepareStatement("delete from accesstoken where accesstoken=?");
-			checktok.setString(1,rscheck.getString("accesstoken"));
-			checktok.executeUpdate();
-			checktok.close();
-			PreparedStatement accessst=conn.prepareStatement("insert into accesstoken(clientid,uid,accesstoken,timestamp)values(?,?,?,?)");
-		   	accessst.setString(1,clientid);
-			accessst.setInt(2,uid);
-		   	accessst.setString(3,accesstoken);
-		   	accessst.setString(4,accesstime);
-		   	accessst.executeUpdate();
-			accessst.close();
-			conn.close();
+			refreshTokens=generateRefreshToken(1, conn);
+			saveRefreshTokens(clientid, uid, refreshTokens,1, conn);
 		}
 		else
 		{
-			PreparedStatement accessst=conn.prepareStatement("insert into accesstoken(clientid,uid,accesstoken,timestamp)values(?,?,?,?)");
-		   	accessst.setString(1, clientid);
-			accessst.setInt(2,uid);
-		   	accessst.setString(3,accesstoken);
-		   	accessst.setString(4,accesstime);
-		   	accessst.executeUpdate();
-			accessst.close();
-		PreparedStatement refreshst=conn.prepareStatement("insert into refreshtoken(clientid,uid,refreshtoken,tokenremain)values(?,?,?,?)");
-	   	refreshst.setString(1, clientid);
-		refreshst.setInt(2,uid);
-	   	refreshst.setString(3,refreshtoken);
-	   	refreshst.setInt(4,20);
-	   	refreshst.executeUpdate();
-	   	refreshst.close();
-	   	conn.close();
+			tok_consumes=(((tokconsumes.getInt("REMAIN"))%20)+1);
+			refreshTokens=generateRefreshToken(tok_consumes,conn);
+			saveRefreshTokens(clientid, uid, refreshTokens,tok_consumes, conn);
 		}
+		conn.close();
+	    return refreshTokens;
 	}
 	
-	//Validate the access tokens
-	public static boolean ValidateAccessToken(String accesstoken,int uid) throws ClassNotFoundException, SQLException, ParseException
+	//Validate the access tokens for API call
+	public static boolean ValidateAccessToken(String accesstoken,int uid,String scope) throws ClassNotFoundException, SQLException, ParseException
 	{
 		Connection conn=developerDao.connect();
+		if(checkResourcePermission(uid,scope,conn)) // To check whether this client have permission to access the protected resources on behalf of user
+		{
 		PreparedStatement checktok=conn.prepareStatement("select * from accesstoken where accesstoken=? and uid=?");
 		checktok.setString(1, accesstoken);
 		checktok.setInt(2, uid);
@@ -215,9 +229,14 @@ public class CreateAccDao
 		   		return false;
 		   	 }
 		}
+		}
+		else
+		{
+			return false;
+		}
 	}
 	
-	//Get the userinfo resources
+	//Get the userinfo resources with help of access token
 	public static CreateAccModel getUsers(int uid) throws SQLException, ClassNotFoundException
 	{
 		Connection conn=developerDao.connect();
@@ -232,15 +251,70 @@ public class CreateAccDao
 		return users;
 	}
 	
-	//Revoke the access token
-	public static boolean DeleteToken(String accesstoken) throws ClassNotFoundException, SQLException
+	//Revoke the Refresh Token
+	public static boolean DeleteToken(String refreshtoken,int uid,String clientid) throws ClassNotFoundException, SQLException
 	{
 		Connection conn=developerDao.connect();
-		PreparedStatement checktok=conn.prepareStatement("delete from accesstoken where accesstoken=?");
-		checktok.setString(1, accesstoken);
-		checktok.executeUpdate();
+		PreparedStatement checktok=conn.prepareStatement("delete from refreshtoken where refreshtoken=? and uid=? and clientid=?");
+		checktok.setString(1, refreshtoken);
+		checktok.setInt(2, uid);
+		checktok.setString(3, clientid);
+		int checkdel=checktok.executeUpdate();
 		conn.close();
-	    return true;
+		if(checkdel==0)
+			return false;
+		else
+	        return true;
 	}
 	
+	//Generate Refresh Tokens
+	public static String generateRefreshToken(int tokcnt,Connection conn) throws SQLException
+	{
+		
+		PreparedStatement getRefreshTok=conn.prepareStatement("select * from refreshtokencollections where tokenid=?");
+		getRefreshTok.setInt(1, tokcnt);
+		ResultSet refTok=getRefreshTok.executeQuery();
+		refTok.next();
+		return refTok.getString("tokens");
+	}
+	
+	//Save Refresh Tokens after generating,with respect to clientid,uid
+	public static void saveRefreshTokens(String clientid,int uid,String refreshTokens,int tokcnt,Connection conn) throws SQLException
+	{
+		PreparedStatement saveReftok=conn.prepareStatement("insert into refreshtoken(clientid,uid,refreshtoken,tokenremain)values(?,?,?,?)");
+		saveReftok.setString(1, clientid);
+		saveReftok.setInt(2, uid);
+		saveReftok.setString(3, refreshTokens);
+		saveReftok.setInt(4, tokcnt);
+		saveReftok.executeUpdate();
+		saveReftok.close();
+	}
+	
+	//When client made an API call to access protected resources,First verified whether the client have permission to access the resources 
+	public static boolean checkResourcePermission(int uid,String scope,Connection conn) throws SQLException
+	{
+		
+		PreparedStatement checkper=conn.prepareStatement("select * from resourcegranted where uid=? and "+scope+"=1");
+		checkper.setInt(1, uid);
+		ResultSet rs=checkper.executeQuery();
+		if(rs.next()==false)
+			return false;
+		else
+			return true;
+	}
+	
+	//Validate refreshToken
+	public static boolean ValidateRefToken(String refreshtoken,int uid,String clientid) throws SQLException, ClassNotFoundException
+	{
+		Connection conn=developerDao.connect();
+		PreparedStatement validTok=conn.prepareStatement("select * from refreshtoken where refreshtoken=? and uid=? and clientid=?");
+	    validTok.setString(1, refreshtoken);
+	    validTok.setInt(2, uid);
+	    validTok.setString(3, clientid);
+	    ResultSet rs=validTok.executeQuery();
+	    if(rs.next()==true)
+	    	return true;
+	    else
+	    	return false;
+	}
 }
